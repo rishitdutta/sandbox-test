@@ -1,0 +1,13 @@
+{
+  "name": "Full Stack Challenge",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspace",
+  "forwardPorts": [3000, 5000, 5432],
+  "postCreateCommand": "npm install --prefix frontend && npm install --prefix backend",
+  "customizations": {
+    "vscode": {
+      "extensions": ["ckinfinite.jedisql"]
+    }
+  }
+}
