@@ -65,9 +65,20 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
 });
 
-app.get("/api/items", rateLimit, async (_req, res) => {
+app.get("/api/items", rateLimit, async (req, res) => {
   try {
-    const result = await pool.query("SELECT id, name FROM items ORDER BY id ASC");
+    const { search = "" } = req.query;
+
+    const result = await pool.query(
+      `
+      SELECT id, name
+      FROM items
+      WHERE name ILIKE '%' || $1 || '%'
+      ORDER BY id ASC
+      `,
+      [search]
+    );
+
     res.json(result.rows);
   } catch (_err) {
     res.status(500).json({ error: "Failed to load items." });
