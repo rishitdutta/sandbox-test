@@ -20,6 +20,32 @@ const pool = new Pool({
 app.use(cors());
 app.use(express.json());
 
+const requestBuckets = new Map();
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const RATE_LIMIT_MAX_REQUESTS = 60;
+
+function rateLimit(req, res, next) {
+  const clientKey = req.ip || req.socket.remoteAddress || "unknown";
+  const currentTime = Date.now();
+  const bucket =
+    requestBuckets.get(clientKey) || { count: 0, windowStart: currentTime };
+
+  if (currentTime - bucket.windowStart >= RATE_LIMIT_WINDOW_MS) {
+    bucket.count = 0;
+    bucket.windowStart = currentTime;
+  }
+
+  bucket.count += 1;
+  requestBuckets.set(clientKey, bucket);
+
+  if (bucket.count > RATE_LIMIT_MAX_REQUESTS) {
+    res.status(429).json({ error: "Too many requests. Please try again later." });
+    return;
+  }
+
+  next();
+}
+
 async function initDb() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS items (
@@ -39,7 +65,7 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
 });
 
-app.get("/api/items", async (_req, res) => {
+app.get("/api/items", rateLimit, async (_req, res) => {
   try {
     const result = await pool.query("SELECT id, name FROM items ORDER BY id ASC");
     res.json(result.rows);
@@ -48,7 +74,7 @@ app.get("/api/items", async (_req, res) => {
   }
 });
 
-app.post("/api/items", async (req, res) => {
+app.post("/api/items", rateLimit, async (req, res) => {
   const { name } = req.body || {};
   if (!name || typeof name !== "string" || name.trim().length === 0) {
     res.status(400).json({ error: "Item name is required." });
